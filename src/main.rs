@@ -1,9 +1,13 @@
-use std::fmt::Display;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
+use askama::Template;
 use axum::{Router, response::IntoResponse, routing::get};
 use chrono::{DateTime, NaiveDate, Utc};
-use maud::{html, Markup, Render, DOCTYPE};
-use rust_decimal::{prelude::FromPrimitive, Decimal};
+use either::Either;
+use rust_decimal::{Decimal, prelude::FromPrimitive};
 
 mod csv_reader;
 
@@ -48,7 +52,9 @@ impl Transaction {
         };
 
         Self {
-            payee, amount, date: Utc::now(),
+            payee,
+            amount,
+            date: Utc::now(),
         }
     }
 
@@ -62,25 +68,61 @@ impl From<Transaction> for TransactionView {
         Self {
             date: value.date.date_naive(),
             payee: value.payee,
-            amount: value.amount
+            amount: value.amount,
         }
     }
 }
 
+
+/// ```askama
+///     <div class="flex flex-col">
+///         <p>{{payee}}</p>
+///         <p>{{amount}}</p>
+///     </div>
+///     <p>{{date}}</p>
+/// ```
+///
+#[derive(Template)]
+#[template(
+    ext = "html",
+    in_doc = true,
+)]
 struct TransactionView {
     payee: String,
     amount: MoneyAmount,
     date: NaiveDate,
 }
 
-impl Render for TransactionView {
-    fn render(&self) -> Markup {
-        html!{
-            div .flex.flex-col {
-                p { (self.payee) }
-                p { (self.amount) }
-            }
-            p { (self.date) }
+#[derive(Template, askama_web::WebTemplate)]
+#[template(path = "index.html")]
+struct MainView {
+    all: HashMap<usize, TransactionView>,
+    grouped: HashMap<usize, Vec<usize>>,
+    leftover: HashSet<usize>,
+}
+
+impl MainView {
+    fn new(transactions: Vec<TransactionView>) -> Self {
+        let all: HashMap<usize, TransactionView> = transactions.into_iter().enumerate().collect();
+        let leftover = all.keys().copied().collect();
+
+        Self {
+            all,
+            leftover,
+            grouped: HashMap::new(),
+        }
+    }
+
+    fn leftovers(&self) -> impl Iterator<Item = (&usize, &TransactionView)> {
+        self.all
+            .iter()
+            .filter(|(k, v)| self.leftover.contains(k))
+    }
+
+    fn group(&self, k: usize) -> impl Iterator<Item = &TransactionView> {
+        match self.grouped.get(&k) {
+            None => Either::Left(std::iter::empty()),
+            Some(group) => Either::Right(group.iter().flat_map(|i| self.all.get(i))),
         }
     }
 }
@@ -90,27 +132,12 @@ async fn transaction_card() -> impl IntoResponse {
         Transaction::new("Robert", 23.44),
         Transaction::new("Jenna Malabonga", -500.0),
         Transaction::new("Mourinho", 1.23),
-    ];
-    html! {
-        (header())
-        div flex.flex-col.space-y-4 {
-            @for transaction in transactions {
-                div .flex.space-x-8.outline-black {
-                    input type="checkbox";
-                    (transaction.into_view())
-                }
-            }
-        }
-    }
-}
+    ]
+    .into_iter()
+    .map(|t| t.into_view())
+    .collect();
 
-fn header() -> Markup {
-    html! {
-        (DOCTYPE)
-        meta charset="utf-8";
-        meta name="viewport" content="width=device-width, initial-scale=1.0";
-        script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" {}
-    }
+    MainView::new(transactions)
 }
 
 #[tokio::main]
