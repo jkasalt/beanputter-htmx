@@ -19,9 +19,9 @@ use tracing::{info, info_span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
-mod csv_reader;
+mod csv;
 
-#[derive(Serialize, Hash, Debug)]
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq)]
 enum Currency {
     Chf,
 }
