@@ -4,15 +4,14 @@ use std::{
     fmt::Display,
 };
 
-use askama::Template;
 use axum::{
     Form, Router,
-    extract::{MatchedPath, RawForm, Request},
+    extract::{MatchedPath, Multipart, Request},
     response::IntoResponse,
     routing::{get, post},
 };
 use chrono::{DateTime, NaiveDate, Utc};
-use either::Either;
+use maud::{DOCTYPE, Markup, html};
 use rust_decimal::{Decimal, prelude::FromPrimitive};
 use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
@@ -85,16 +84,6 @@ impl From<Transaction> for TransactionView {
     }
 }
 
-/// ```askama
-///     <div class="flex flex-col">
-///         <p>{{payee}}</p>
-///         <p>{{amount}}</p>
-///     </div>
-///     <p>{{date}}</p>
-/// ```
-///
-#[derive(Template, Hash)]
-#[template(ext = "html", in_doc = true)]
 struct TransactionView {
     view_id: Uuid,
     payee: String,
@@ -102,8 +91,6 @@ struct TransactionView {
     date: NaiveDate,
 }
 
-#[derive(Template, askama_web::WebTemplate)]
-#[template(path = "index.html")]
 struct MainView {
     all: HashMap<usize, TransactionView>,
     grouped: Vec<Vec<usize>>,
@@ -129,7 +116,7 @@ impl MainView {
     }
 }
 
-async fn main_view() -> impl IntoResponse {
+fn main_view() -> MainView {
     let transactions = vec![
         Transaction::new("Robert", 23.44),
         Transaction::new("Jenna Malabonga", -500.0),
@@ -161,6 +148,91 @@ async fn group_up(Form(req): Form<GroupRequest>) -> impl IntoResponse {
     ""
 }
 
+async fn load_file(mut multipart: Multipart) -> impl IntoResponse {
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        let name = field.name().unwrap().to_owned();
+        let content_type = field.content_type().unwrap().to_owned();
+        let data = field.text().await.unwrap();
+
+        info!("(`{name}`, type=`{content_type}`): `{data}`");
+    }
+    html! {
+        h1 { "Loaded!" }
+    }
+}
+
+fn upload_file_form() -> Markup {
+    html! {
+        form id="load-file" hx-encoding="multipart/form-data" hx-post="/load" {
+
+          input type="file" name="file" {}
+          button { "Upload" }
+        }
+    }
+}
+
+async fn index() -> Markup {
+    html! {
+        (DOCTYPE)
+        html {
+            (header())
+            (body())
+        }
+    }
+}
+
+fn body() -> Markup {
+    let view = main_view();
+    html! {
+        body {
+            (upload_file_form())
+            (grouper_form(&view))
+        }
+    }
+}
+
+fn header() -> Markup {
+    // <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    html! {
+        head {
+            meta charset="utf8";
+            meta name="viewport" content="width=device-width, initial-scale=1.0";
+            script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" {}
+            script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js" {}
+        }
+    }
+}
+
+fn grouper_form(view: &MainView) -> Markup {
+    html! {
+        div x-data="{ selected: [] }" {
+            p x-text="selected" {}
+            form action="/group-up" method="post" {
+                @for transaction_view in view.leftovers() {
+                    li class="flex" {
+                        (grouper_form_item(transaction_view))
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn grouper_form_item(tv: &TransactionView) -> Markup {
+    html! {
+        input
+          type="checkbox"
+          value=(tv.view_id)
+          x-model="selected";
+
+        div .flex.flex-col {
+            p {(tv.payee)}
+            p {(tv.amount)}
+        }
+        p {(tv.date)}
+    }
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
@@ -179,8 +251,9 @@ async fn main() {
         .init();
 
     let app = Router::new()
-        .route("/", get(main_view))
+        .route("/", get(index))
         .route("/group-up", post(group_up))
+        .route("/load", post(load_file))
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
                 // Log the matched route's path (with placeholders not filled in).
