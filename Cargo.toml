@@ -4,15 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = {version = "0.8", features = ["tracing"]}
-chrono = "0.4"
+axum = { version = "0.8", features = ["tracing"] }
+chrono = { version = "0.4" }
 csv = "1"
 either = "1"
-askama = {version = "0.14", features = ["code-in-doc"]}
-askama_web = {version = "0.14", features = ["axum-0.8"]}
+askama = { version = "0.14", features = ["code-in-doc"] }
+askama_web = { version = "0.14", features = ["axum-0.8"] }
 rust_decimal = "1"
 serde = { version = "1", features = ["derive"] }
-tokio = { version = "1", features = [ "full" ] }
+tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
-tracing-subscriber = {version = "0.3", features = ["env-filter"]}
-tower-http = {version = "0.6", features = ["trace"]}
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["trace"] }
+uuid = { version = "1.17.0", features = ["v4"] }
