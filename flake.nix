@@ -9,6 +9,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     rust-flake.url = "github:juspay/rust-flake";
+    proc-flake.url = "github:srid/proc-flake";
+    flake-root.url = "github:srid/flake-root";
   };
 
   outputs =
@@ -18,6 +20,8 @@
         inputs.treefmt-nix.flakeModule
         inputs.rust-flake.flakeModules.default
         inputs.rust-flake.flakeModules.nixpkgs
+        inputs.proc-flake.flakeModule
+        inputs.flake-root.flakeModule
       ];
       systems = [
         "x86_64-linux"
@@ -30,9 +34,15 @@
           pkgs,
           system,
           self',
+          config,
           ...
         }:
         {
+          proc.groups.run.processes = {
+            dioxus-serve.command = "dx serve --port 42069";
+            tailwind.command = "tailwindcss --watch -i ./input.css -o ./assets/tailwind.css";
+          };
+
           treefmt.programs = {
             nixfmt.enable = true;
             rustfmt.enable = true;
@@ -58,11 +68,13 @@
           devShells.default = pkgs.mkShell {
             inputsFrom = [ self'.devShells.rust ];
             buildInputs = with pkgs; [
+              config.proc.groups.run.package
               dioxus-cli
               wasm-bindgen-cli
               lld
               bacon
               tailwindcss_4
+              watchman
             ];
           };
         };
