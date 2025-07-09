@@ -53,12 +53,10 @@ impl SingleTransactionViewProps {
 #[component]
 pub fn SingleTransactionView(props: SingleTransactionViewProps) -> Element {
     rsx! {
-        div { class: "single-transaction",
-            "{props.date}"
-            "{props.commodity}"
-            "{props.amount}"
-            "{props.payee}"
-            "{props.description}"
-        }
+        span { "{props.date}" }
+        span { "{props.commodity}" }
+        span { "{props.amount}" }
+        span { "{props.payee}" }
+        span { "{props.description}" }
     }
 }

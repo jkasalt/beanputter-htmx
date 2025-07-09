@@ -49,25 +49,32 @@ Date de transaction;Heure de transaction;Date de comptabilisation;Date de valeur
 
     rsx! {
         document::Stylesheet { href: TAILWIND }
-        // Title {}
-        // DogView {}
-        {format!("{selected:?}")}
-        {
-            transaction_views_props
-                .iter()
-                .map(|t| {
-                    let id = t.id;
-                    let selected = *selection.read().get(&id).unwrap_or(&false);
-                    let label = if selected { "Deselect"} else {"Select"};
-                    rsx! {
-                        button {
-                            onclick: move |_| {
-                                selection.clone().write().entry(id).and_modify(|v| *v = !*v).or_insert(true);
-                            },
-                            "{label}" SingleTransactionView { ..t.clone() }
+        div { class: "flex flex-col",
+            {
+                transaction_views_props
+                    .iter()
+                    .map(|t| {
+                        let id = t.id;
+                        let selected = *selection.read().get(&id).unwrap_or(&false);
+                        let common_class = "flex flex-row cursor-pointer gap-2";
+                        let selected_class = if selected {
+                            "bg-green-100"
+                        } else {
+                            "bg-gray-200"
+                        };
+                        let class = format!("{common_class} {selected_class}");
+                        rsx! {
+                            button {
+                                class,
+                                onclick: move |_| {
+                                    selection.clone().write().entry(id).and_modify(|v| *v = !*v).or_insert(true);
+                                },
+                                input { r#type: "checkbox", checked: selected }
+                                SingleTransactionView { ..t.clone() }
+                            }
                         }
-                    }
-                })
+                    })
+            }
         }
     }
 }
