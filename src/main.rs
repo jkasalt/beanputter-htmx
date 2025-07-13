@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use dioxus::prelude::*;
-use transaction::{Transaction, TransactionView, TransactionViewProps};
+use transaction::{Transaction, TransactionView};
 
 mod csv;
 mod transaction;
@@ -9,10 +9,19 @@ mod transaction;
 static TAILWIND: Asset = asset!("/assets/tailwind.css");
 
 #[derive(Clone)]
-struct AllTransactionsContext(pub(crate) Signal<HashMap<usize, Transaction>>);
+struct AllTransactionsContext(pub(crate) Signal<HashMap<Id, Transaction>>);
 
 #[derive(Clone)]
-struct SelectionContext(pub(crate) Signal<HashMap<usize, bool>>);
+struct SelectionContext(pub(crate) Signal<HashMap<Id, bool>>);
+
+impl SelectionContext {
+    fn has(&self, id: &Id) -> bool {
+        *self.0.read().get(id).unwrap_or(&false)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct Id(usize);
 
 fn main() {
     dioxus::launch(App);
@@ -44,6 +53,7 @@ Date de transaction;Heure de transaction;Date de comptabilisation;Date de valeur
                 .into_iter()
                 .map(Transaction::from)
                 .enumerate()
+                .map(|(i, t)| (Id(i), t))
                 .collect(),
         ))
     });
@@ -69,20 +79,11 @@ Date de transaction;Heure de transaction;Date de comptabilisation;Date de valeur
         ))
     });
 
-    let selected = use_memo(move || {
-        selection
-            .0
-            .read()
-            .iter()
-            .filter_map(|(id, is_selected)| is_selected.then_some(*id))
-            .collect::<Vec<_>>()
-    });
-
     let group_up = || {
         move |_| {
-            let new_group: Vec<usize> = leftovers
+            let new_group: Vec<Id> = leftovers
                 .write()
-                .extract_if(.., |leftover_id| selected.read().contains(leftover_id))
+                .extract_if(.., |id| selection.has(id))
                 .collect();
             for id in &new_group {
                 selection
@@ -92,14 +93,12 @@ Date de transaction;Heure de transaction;Date de comptabilisation;Date de valeur
                     .and_modify(|v| *v = false)
                     .or_insert(false);
             }
-            groups.with_mut(|g| g.push(new_group));
+            groups.write().push(new_group);
         }
     };
 
     rsx! {
         document::Stylesheet { href: TAILWIND }
-        {format!("{selected:?}")}
-        {format!("{groups:?}")}
         div { class: "flex flex-row gap-2",
             label { r#for: "fileinput", "Upload csv trascript" }
             input {
@@ -126,14 +125,46 @@ Date de transaction;Heure de transaction;Date de comptabilisation;Date de valeur
                 "group up"
             }
         }
-        Leftovers {ids: leftovers}
+        Groups { groups }
+        Leftovers { ids: leftovers }
     }
 }
 
 #[component]
-fn Leftovers(ids: ReadOnlySignal<Vec<usize>>) -> Element {
-    let mut selection = use_context::<SelectionContext>();
+fn Groups(groups: ReadOnlySignal<Vec<Vec<Id>>>) -> Element {
+    rsx! {
+        ul {
+            {groups.read().iter().map(|group| rsx! {
+                li {
+                    ul {
+                        {group.iter().map(|&id| rsx! {
+                            li { class: "bg-blue-100",
+                                TransactionView { id }
+                            }
+                        })}
+                    }
+                }
+            })}
+        }
+    }
+}
 
+#[component]
+fn Leftovers(ids: ReadOnlySignal<Vec<Id>>) -> Element {
+    rsx! {
+        ul {
+            {ids.read().iter().map(|id| rsx! {
+                li {
+                    Leftover { id: *id }
+                }
+            })}
+        }
+    }
+}
+
+#[component]
+fn Leftover(id: Id) -> Element {
+    let mut selection = use_context::<SelectionContext>();
     let toggle_select = |id| {
         move |_| {
             selection
@@ -144,29 +175,18 @@ fn Leftovers(ids: ReadOnlySignal<Vec<usize>>) -> Element {
                 .or_insert(true);
         }
     };
-
+    let is_selected = selection.has(&id);
+    let common_class = "flex flex-row cursor-pointer gap-2";
+    let selected_class = if is_selected {
+        "bg-green-100"
+    } else {
+        "bg-gray-200"
+    };
+    let class = format!("{common_class} {selected_class}");
     rsx! {
-        div { class: "flex flex-col",
-            {
-                ids.read()
-                    .iter()
-                    .map(|id| {
-                        let is_selected = *selection.0.read().get(id).unwrap_or(&false);
-                        let common_class = "flex flex-row cursor-pointer gap-2";
-                        let selected_class = if is_selected {
-                            "bg-green-100"
-                        } else {
-                            "bg-gray-200"
-                        };
-                        let class = format!("{common_class} {selected_class}");
-                        rsx! {
-                            button { class, onclick: toggle_select(*id),
-                                input { r#type: "checkbox", checked: is_selected }
-                                TransactionView { id: *id }
-                            }
-                        }
-                    })
-            }
+        button { class, onclick: toggle_select(id),
+            input { r#type: "checkbox", checked: is_selected }
+            TransactionView { id }
         }
     }
 }

@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-
 use chrono::NaiveDate;
 use dioxus::prelude::*;
 use rust_decimal::Decimal;
 
-use crate::{csv::UbsTransactionRecord, AllTransactionsContext};
+use crate::{csv::UbsTransactionRecord, AllTransactionsContext, Id};
 
 pub(crate) struct Transaction {
     date: NaiveDate,
@@ -30,7 +28,7 @@ impl From<UbsTransactionRecord> for Transaction {
 }
 
 #[component]
-pub fn TransactionView(id: usize) -> Element {
+pub fn TransactionView(id: Id) -> Element {
     let all_transactions = use_context::<AllTransactionsContext>();
     let props = &all_transactions.0.read()[&id];
     rsx! {

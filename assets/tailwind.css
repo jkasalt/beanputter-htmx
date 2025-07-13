@@ -8,6 +8,7 @@
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
     monospace;
     --color-green-100: oklch(96.2% 0.044 156.743);
+    --color-blue-100: oklch(93.2% 0.032 255.585);
     --color-gray-200: oklch(92.8% 0.006 264.531);
     --color-gray-300: oklch(87.2% 0.01 258.338);
     --color-black: #000;
@@ -208,6 +209,9 @@
   }
   .border-black {
     border-color: var(--color-black);
+  }
+  .bg-blue-100 {
+    background-color: var(--color-blue-100);
   }
   .bg-gray-200 {
     background-color: var(--color-gray-200);
