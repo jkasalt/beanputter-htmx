@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use chrono::NaiveDate;
 use dioxus::prelude::*;
 use rust_decimal::Decimal;
 
-use crate::csv::UbsTransactionRecord;
+use crate::{csv::UbsTransactionRecord, AllTransactionsContext};
 
-pub(crate) struct SingleTransaction {
+pub(crate) struct Transaction {
     date: NaiveDate,
     commodity: String,
     amount: Decimal,
@@ -12,7 +14,7 @@ pub(crate) struct SingleTransaction {
     description: String,
 }
 
-impl From<UbsTransactionRecord> for SingleTransaction {
+impl From<UbsTransactionRecord> for Transaction {
     fn from(value: UbsTransactionRecord) -> Self {
         let amount = value.credit.unwrap_or(Decimal::ZERO) - value.debit.unwrap_or(Decimal::ZERO);
         let commodity = value.currency;
@@ -27,31 +29,10 @@ impl From<UbsTransactionRecord> for SingleTransaction {
     }
 }
 
-#[derive(Props, PartialEq, Eq, Clone, Hash, Debug)]
-pub(crate) struct SingleTransactionViewProps {
-    pub(crate) id: usize,
-    pub(crate) date: NaiveDate,
-    pub(crate) commodity: String,
-    pub(crate) amount: Decimal,
-    pub(crate) payee: String,
-    pub(crate) description: String,
-}
-
-impl SingleTransactionViewProps {
-    pub(crate) fn from_model_with_id(model: SingleTransaction, id: usize) -> Self {
-        Self {
-            id,
-            date: model.date,
-            commodity: model.commodity,
-            amount: model.amount,
-            payee: model.payee,
-            description: model.description,
-        }
-    }
-}
-
 #[component]
-pub fn SingleTransactionView(props: SingleTransactionViewProps) -> Element {
+pub fn TransactionView(id: usize) -> Element {
+    let all_transactions = use_context::<AllTransactionsContext>();
+    let props = &all_transactions.0.read()[&id];
     rsx! {
         span { "{props.date}" }
         span { "{props.commodity}" }
